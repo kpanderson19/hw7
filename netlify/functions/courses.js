@@ -35,7 +35,7 @@
 let firebase = require(`./firebase`)
 
 // /.netlify/functions/courses?courseNumber=KIEI-451
-exports.handler = async function(event) {
+exports.handler = async function (event) {
 
   // get the course number being requested
   let courseNumber = event.queryStringParameters.courseNumber
@@ -70,14 +70,20 @@ exports.handler = async function(event) {
   // get the documents from the query
   let sections = sectionsQuery.docs
 
+  // course sums and averages 
+  let courseSum = 0
+
+  // // course average 
+  // let courseAverage = 0 
+
   // loop through the documents
-  for (let i=0; i < sections.length; i++) {
+  for (let i = 0; i < sections.length; i++) {
     // get the document ID of the section
     let sectionId = sections[i].id
 
     // get the data from the section
     let sectionData = sections[i].data()
-    
+
     // create an Object to be added to the return value of our lambda
     let sectionObject = {}
 
@@ -90,12 +96,74 @@ exports.handler = async function(event) {
     // add the lecturer's name to the section Object
     sectionObject.lecturerName = lecturer.name
 
+    // set a new Array as part of the return value
+    sectionObject.listOfReviews = []
+
     // add the section Object to the return value
     returnValue.sections.push(sectionObject)
 
     // 🔥 your code for the reviews/ratings goes here
-  }
 
+    // ask Firebase for the reviews for each section 
+    let reviewsQuery = await db.collection('reviews').where(`sectionId`, `==`, sectionId).get()
+
+    // get the data from the returned document
+    let reviews = reviewsQuery.docs
+   
+  
+    // sum the number of section reviews 
+    let sum = 0
+
+    //loop through all reviews 
+    for (let r = 0; r < reviews.length; r++) {
+
+      // get the data from the section
+      let reviewData = reviews[r].data()
+
+      // create an Object to be added to the return value of our lambda
+      let reviewObject = {
+        reviewBody: reviewData.body,
+        reviewRating: reviewData.rating
+      }//end of review object
+
+      //// add the review Object to the return value
+   sectionObject.listOfReviews.push(reviewObject)
+   
+   //sum is equal to 0; reviewData.rating = 5
+   //update the sum to add previous sum PLUS the rating 
+   sum = sum + reviewData.rating
+
+   //section average based on updated sum 
+    let average = sum/reviews.length
+    console.log(average)
+
+    // add the section average to the section Object
+    sectionObject.sectionAverage = average
+
+    // //define total number of reviews 
+    // let totalReviews = reviewData.rating + reviewData.rating
+
+    }//end of loop for reviews 
+    
+    //update course sum to be sums of the sections 
+    courseSum = courseSum + sum
+
+    // courseAverage = courseAverage + average
+
+
+  }//end of loop for sections 
+
+// add the total course Sum to the course Object (return value)
+returnValue.totalRating = courseSum
+
+// add the totalcourse Average to the course Object (return value)
+// returnValue.totalAverageRating = courseAverage
+
+// // course average
+// let courseAverage = courseSum/reviews.length
+
+
+console.log(returnValue)
   // return the standard response
   return {
     statusCode: 200,
